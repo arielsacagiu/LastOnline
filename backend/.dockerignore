@@ -1,0 +1,11 @@
+node_modules
+.env
+session_logs
+wa_session
+wa_session_runtime
+wa_remote_session
+wa_link_test
+prisma/dev.db
+prisma/dev.db-journal
+test
+npm-debug.log

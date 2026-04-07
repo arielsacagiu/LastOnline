@@ -1,0 +1,22 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    container_name: lastonline-backend
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: file:/app/data/dev.db
+    ports:
+      - "3000:3000"
+    volumes:
+      - backend_data:/app/data
+      - backend_wa_session:/app/wa_session
+      - backend_session_logs:/app/session_logs
+
+volumes:
+  backend_data:
+  backend_wa_session:
+  backend_session_logs:

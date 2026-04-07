@@ -7,12 +7,35 @@ function parseCsv(value) {
     .filter(Boolean);
 }
 
+function parseBoolean(value, fallback = false) {
+  if (value == null || value === '') {
+    return fallback;
+  }
+
+  const normalized = String(value).trim().toLowerCase();
+  return normalized === '1' || normalized === 'true' || normalized === 'yes';
+}
+
+function parseTrustProxy(value, isProduction) {
+  if (value == null || value === '') {
+    return isProduction ? 1 : false;
+  }
+
+  if (/^\d+$/.test(String(value).trim())) {
+    return Number(value);
+  }
+
+  return parseBoolean(value, false) ? true : value;
+}
+
 function buildAppConfig(env = process.env) {
   const nodeEnv = env.NODE_ENV || 'development';
   const isProduction = nodeEnv === 'production';
   const jwtSecret = String(env.JWT_SECRET || '').trim();
   const port = Number(env.PORT || 3000);
   const corsOrigins = parseCsv(env.CORS_ORIGINS);
+  const trustProxy = parseTrustProxy(env.TRUST_PROXY, isProduction);
+  const enableCompression = parseBoolean(env.ENABLE_COMPRESSION, true);
 
   function validate() {
     if (!jwtSecret) {
@@ -34,6 +57,8 @@ function buildAppConfig(env = process.env) {
     jwtSecret,
     port: Number.isFinite(port) && port > 0 ? port : 3000,
     corsOrigins,
+    trustProxy,
+    enableCompression,
     validate,
   };
 }

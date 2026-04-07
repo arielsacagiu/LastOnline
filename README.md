@@ -1,89 +1,51 @@
-# WhatsApp Last Seen Tracker
+# LastOnline
 
-A cross-platform Flutter app (Android & iOS) + Node.js backend that lets multiple users each track when their WhatsApp contacts were last online.
+LastOnline is a Flutter mobile app plus a Node.js backend that tracks WhatsApp Web presence changes for saved contacts, stores online sessions, and streams live updates to the app.
 
----
+## Repo Layout
 
-## Architecture
-
+```text
+.
+|-- backend/            # Express + Prisma + Puppeteer tracker
+|-- whatsapp_tracker/   # Flutter mobile app
+|-- docker-compose.production.yml
+`-- .github/workflows/ci.yml
 ```
-windsurf-project-3/
-├── backend/          # Node.js + Express + Prisma (SQLite) + Puppeteer scraper
-└── whatsapp_tracker/ # Flutter app (Android + iOS)
-```
 
----
+## Current Status
 
-## Backend Setup
+- Good fit for private use or a controlled beta.
+- Better prepared for deployment than a raw prototype.
+- Still depends on WhatsApp Web automation, which is the main production risk.
 
-### Requirements
-- Node.js 18+
-- A machine that can run a headless Chromium (for WhatsApp Web scraping)
+## Features
 
-### Steps
+- Multi-user auth
+- Per-contact status tracking
+- Online session reconstruction with timestamps and duration
+- Session log files written to `backend/session_logs/`
+- Live SSE updates to the Flutter app
+- Analytics, monitoring, and weekly summaries
+
+## Local Development
+
+### Backend
 
 ```bash
 cd backend
+cp .env.example .env
 npm install
-npx prisma migrate dev --name init   # creates prisma/dev.db
-npm start                             # starts on port 3000
+npx prisma migrate dev
+npm start
 ```
 
-The server will:
-- Expose REST API at `http://<your-ip>:3000`
-- Run the polling loop every **1 second by default** via Puppeteer (`CHECK_INTERVAL_MS` configurable)
+Important local files:
 
-### Environment Variables (`.env`)
-```
-DATABASE_URL="file:./dev.db"
-JWT_SECRET="your_secret_key_here"
-PORT=3000
-CHECK_INTERVAL_MS=1000
-WHATSAPP_SETTLE_MS=500
-```
+- `.env` contains local secrets and is ignored by git
+- `prisma/dev.db` is the local SQLite database
+- `wa_session/` stores the WhatsApp Web browser session
 
-Notes:
-- `CHECK_INTERVAL_MS` supports fast polling and is clamped to a minimum of `500` ms
-- If a Puppeteer sweep is still running, the next tick is skipped instead of overlapping
-- Real throughput still depends on how long WhatsApp Web takes to load and how many contacts you track
-- The backend now keeps WhatsApp Web monitor pages open for tracked contacts instead of reopening a fresh page every cycle
-- Contacts now store their current status and last-checked timestamp directly, while `LastSeenLog` keeps state-change history instead of every single poll
-
-### API Endpoints
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/api/auth/register` | Register a new user |
-| POST | `/api/auth/login` | Login |
-| GET | `/api/auth/me` | Get current user |
-| GET | `/api/contacts` | List tracked contacts |
-| POST | `/api/contacts` | Add a contact to track |
-| DELETE | `/api/contacts/:id` | Remove a contact |
-| GET | `/api/logs/:contactId` | Get last seen logs |
-| GET | `/api/stream` | Authenticated SSE stream for live updates |
-| GET | `/api/health` | Server health check |
-
----
-
-## WhatsApp Web – First-Time QR Setup
-
-WhatsApp Web requires a QR code scan on first use. On the server machine:
-
-1. Change `headless: true` to `headless: false` in `backend/src/scraper.js`
-2. Start the server: `npm start`
-3. A Chrome window will open — scan the QR code with your WhatsApp
-4. Once authenticated, set `headless` back to `true` and restart
-
-> WhatsApp Web sessions persist in the Puppeteer user data dir. You only need to scan once.
-
----
-
-## Flutter App Setup
-
-### Requirements
-- Flutter 3.x SDK
-- Android Studio / Xcode for building
-
-### Run in development
+### Flutter App
 
 ```bash
 cd whatsapp_tracker
@@ -91,45 +53,137 @@ flutter pub get
 flutter run
 ```
 
-### Build APK (Android)
+Debug builds default to:
 
-```bash
-flutter build apk --release
-# Output: build/app/outputs/flutter-apk/app-release.apk
+```text
+http://10.0.2.2:3000
 ```
 
-### Build for iOS
+## Release Build
+
+Release builds require a real backend URL at build time:
 
 ```bash
-flutter build ios --release
+cd whatsapp_tracker
+flutter build apk --release \
+  --dart-define=PRODUCTION_BASE_URL=https://api.your-domain.com
 ```
 
-### Configure Server URL
+Optional beta escape hatch:
 
-On first launch, tap **Server Settings** (gear icon on login screen) and enter your backend URL:
-- **Android emulator:** `http://10.0.2.2:3000`
-- **Real device (same WiFi):** `http://192.168.x.x:3000`
-- **Production server:** `https://your-domain.com`
+```bash
+--dart-define=ALLOW_SERVER_OVERRIDE=true
+```
 
----
+## Backend Environment
 
-## Features
+Start from [`backend/.env.example`](backend/.env.example).
 
-- **Multi-user:** Each account tracks its own set of contacts independently
-- **Per-contact logs:** Full history of online/offline/last seen status
-- **Auto-polling:** Backend runs on a configurable millisecond polling interval
-- **Live updates:** The mobile app receives server-sent events and updates active screens without manual refresh
-- **Activity chart:** Contact detail screens show a recent status breakdown chart
-- **Dark mode:** Full light/dark theme support
-- **Real-time refresh:** Pull-to-refresh on the contacts dashboard
-- **Server config:** Configurable backend URL from within the app
+Important production values:
 
----
+- `NODE_ENV=production`
+- `JWT_SECRET=<long random secret>`
+- `CORS_ORIGINS=https://app.your-domain.com`
+- `PORT=3000`
+- `DATABASE_URL=...`
+- `TRUST_PROXY=1`
 
-## Publishing to Google Play / App Store
+Optional tuning:
 
-1. Follow Flutter's [Android deployment guide](https://docs.flutter.dev/deployment/android)
-2. Generate a signing key: `keytool -genkey -v -keystore release-key.jks ...`
-3. Configure `android/key.properties` and `android/app/build.gradle`
-4. Run `flutter build apk --release` or `flutter build appbundle --release`
-5. Upload the `.aab` to Google Play Console
+- `CHECK_INTERVAL_MS`
+- `WHATSAPP_SETTLE_MS`
+- `SESSION_LOG_TIMEZONE`
+- `ENABLE_COMPRESSION`
+- `WHATSAPP_BROWSER_URL`
+
+## Deployment Options
+
+### Docker
+
+The repo includes:
+
+- [`backend/Dockerfile`](backend/Dockerfile)
+- [`backend/.dockerignore`](backend/.dockerignore)
+- [`docker-compose.production.yml`](docker-compose.production.yml)
+
+Typical flow:
+
+```bash
+cp backend/.env.example backend/.env
+docker compose -f docker-compose.production.yml up -d --build
+```
+
+The Docker image starts with:
+
+```bash
+npx prisma migrate deploy && node src/index.js
+```
+
+### PM2 on a VM
+
+The repo also includes [`backend/ecosystem.config.cjs`](backend/ecosystem.config.cjs).
+
+```bash
+cd backend
+npm install
+pm2 start ecosystem.config.cjs
+pm2 save
+```
+
+The PM2 config uses `npm run start:prod`, which applies Prisma migrations before starting the API.
+
+## CI
+
+GitHub Actions is configured in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) to run:
+
+- backend tests
+- Flutter analyze
+- Flutter tests
+- backend Docker image build
+
+## Tests
+
+Backend tests:
+
+```bash
+cd backend
+npm test
+```
+
+## Session Logs
+
+Per-contact text logs are written to:
+
+```text
+backend/session_logs/
+```
+
+Example line:
+
+```text
+2026-04-07 | logged on from 17:28:05-17:31:46 | 3 minutes 40 seconds
+```
+
+## Production Notes
+
+What is already improved in-repo:
+
+- config validation
+- CORS restrictions for production
+- helmet + compression
+- stronger contact validation and duplicate detection
+- deploy/runtime files
+- CI automation
+- session logging
+
+What still requires manual work:
+
+- provision a server that stays online
+- set real production env values
+- set up HTTPS and a real domain
+- choose and operate your production database strategy
+- keep the WhatsApp Web account linked on the server
+
+## Important Limitation
+
+The tracker works by automating WhatsApp Web through Puppeteer. That is the biggest operational and policy risk in this project. Treat this repo as private-beta-ready infrastructure, not guaranteed public-store-safe infrastructure.
