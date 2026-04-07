@@ -1,0 +1,34 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Backend secrets and local runtime state
+backend/.env
+backend/node_modules/
+backend/prisma/dev.db
+backend/prisma/dev.db-journal
+backend/session_logs/
+backend/wa_session/
+backend/wa_session_runtime/
+backend/wa_remote_session/
+backend/wa_link_test/
+
+# Flutter / Dart generated files
+whatsapp_tracker/.dart_tool/
+whatsapp_tracker/build/
+whatsapp_tracker/.flutter-plugins
+whatsapp_tracker/.flutter-plugins-dependencies
+whatsapp_tracker/.pub-cache/
+whatsapp_tracker/.pub/
+whatsapp_tracker/.idea/
+whatsapp_tracker/*.iml
+
+# Platform build outputs
+whatsapp_tracker/android/app/debug/
+whatsapp_tracker/android/app/profile/
+whatsapp_tracker/android/app/release/
+whatsapp_tracker/android/build/
+whatsapp_tracker/android/local.properties
+whatsapp_tracker/ios/Flutter/.last_build_id

@@ -1,0 +1,11 @@
+# Android signing configuration for WhatsApp Tracker
+# 
+# Generate keystore with:
+# keytool -genkey -v -keystore ~/upload-keystore.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload
+#
+# Then update the values below with your actual keystore details
+
+storeFile=/path/to/your/upload-keystore.jks
+storePassword=your-keystore-password
+keyAlias=upload
+keyPassword=your-key-password

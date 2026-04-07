@@ -1,0 +1,143 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            Int            @id @default(autoincrement())
+  email         String         @unique
+  password      String
+  name          String
+  createdAt     DateTime       @default(now())
+  contacts      Contact[]
+  weeklyReports WeeklyReport[]
+  monitorHealth MonitorHealth[]
+  anomalies     AnomalyEvent[]
+}
+
+model Contact {
+  id              Int       @id @default(autoincrement())
+  userId          Int
+  name            String
+  phone           String
+  tags            String?   // JSON array of tags: ["family", "spouse", "work"]
+  circle          String?   // Primary circle: "family", "work", "friends"
+  currentStatus   String?
+  currentLastSeen String?
+  lastCheckedAt   DateTime?
+  createdAt       DateTime  @default(now())
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  logs            LastSeenLog[]
+  sessions        OnlineSession[]
+  anomalies       AnomalyEvent[]
+  routines        ContactRoutine[]
+
+  @@index([userId])
+  @@index([userId, currentStatus])
+}
+
+model LastSeenLog {
+  id        Int      @id @default(autoincrement())
+  contactId Int
+  status    String
+  lastSeen  String?
+  checkedAt DateTime @default(now())
+  contact   Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  sessions  OnlineSession[]
+
+  @@index([contactId, checkedAt])
+}
+
+model OnlineSession {
+  id          Int      @id @default(autoincrement())
+  contactId   Int
+  logId       Int
+  startedAt   DateTime @default(now())
+  endedAt     DateTime?
+  durationSec Int?     // Duration in seconds, calculated when session ends
+  contact     Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  log         LastSeenLog @relation(fields: [logId], references: [id], onDelete: Cascade)
+  overlaps1   SessionOverlap[] @relation("Session1Overlaps")
+  overlaps2   SessionOverlap[] @relation("Session2Overlaps")
+
+  @@index([contactId, startedAt])
+  @@index([logId])
+}
+
+model SessionOverlap {
+  id              Int      @id @default(autoincrement())
+  session1Id      Int
+  session2Id      Int
+  startedAt       DateTime @default(now())
+  endedAt         DateTime?
+  durationSec     Int?     // Overlap duration in seconds
+  session1        OnlineSession @relation("Session1Overlaps", fields: [session1Id], references: [id], onDelete: Cascade)
+  session2        OnlineSession @relation("Session2Overlaps", fields: [session2Id], references: [id], onDelete: Cascade)
+}
+
+model WeeklyReport {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  weekStart   DateTime // Monday of the week
+  weekEnd     DateTime // Sunday of the week
+  totalOnlineSec Int   // Total online seconds across all contacts
+  reportData   String   // JSON string with detailed analytics: top contacts, patterns, overlaps
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, weekStart])
+}
+
+model MonitorHealth {
+  id            Int      @id @default(autoincrement())
+  userId        Int
+  date          DateTime @default(now()) // UTC date
+  checksRun    Int      @default(0)     // Total checks attempted
+  checksOk     Int      @default(0)     // Successful checks
+  gapsDetected Int      @default(0)     // Missed check windows
+  avgGapSec    Int?                     // Average gap duration in seconds
+  uptimePct    Float?                   // Uptime percentage (0-100)
+  createdAt    DateTime @default(now())
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+}
+
+model AnomalyEvent {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  contactId   Int?
+  type        String   // "late_night", "unusual_pattern", "gap", "group_anomaly"
+  severity    String   // "low", "medium", "high"
+  title       String   // Human-readable anomaly title
+  description String?  // Detailed explanation
+  metadata    String?  // JSON with anomaly-specific data
+  resolved    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contact     Contact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([userId, resolved, createdAt])
+}
+
+model ContactRoutine {
+  id            Int      @id @default(autoincrement())
+  contactId     Int
+  weekDay       Int      // 0 = Sunday, 6 = Saturday
+  typicalWakeHour Int?   // Usually wakes up around this hour (0-23)
+  typicalSleepHour Int?  // Usually goes offline around this hour (0-23)
+  peakStartHour Int?     // Peak activity starts around this hour
+  peakEndHour   Int?     // Peak activity ends around this hour
+  avgOnlineSec  Float?   // Average daily online time in seconds
+  sessionCount  Float?   // Average number of sessions per day
+  confidence    Float    // 0-1 confidence score based on data quality
+  sampleDays    Int      @default(0) // Number of days used for baseline
+  lastUpdated   DateTime @default(now())
+  contact       Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  
+  @@unique([contactId, weekDay])
+}
