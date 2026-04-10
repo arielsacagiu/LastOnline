@@ -38,6 +38,7 @@ RUN npx prisma generate
 
 COPY src ./src
 COPY setup.js ./setup.js
+COPY setup_phone_code.js ./setup_phone_code.js
 COPY query_sessions.js ./query_sessions.js
 
 RUN mkdir -p /app/data /app/wa_session /app/session_logs \
